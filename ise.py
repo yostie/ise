@@ -1284,16 +1284,16 @@ class ERS(object):
     def add_device(self,
                    name,
                    ip_address,
-                   radius_key,
-                   snmp_ro,
-                   dev_group,
-                   dev_location,
-                   dev_type,
                    description='',
-                   snmp_v='TWO_C',
+                   dev_location='Location#All Locations',
+                   dev_ipsec='IPSEC#Is IPSEC Device#No',
+                   dev_type='Device Type#All Device Types',
                    dev_profile='Cisco',
+                   radius_key=None,
+                   snmp_ro=None,
+                   snmp_version='TWO_C',
                    tacacs_shared_secret=None,
-                   tacas_connect_mode_options='ON_LEGACY'
+                   tacacs_connect_mode_options='OFF'
                    ):
         """
         Add a device.
@@ -1318,39 +1318,46 @@ class ERS(object):
         self.ise.headers.update(
             {'ACCEPT': 'application/json', 'Content-Type': 'application/json'})
 
-        data = {'NetworkDevice': {'name': name,
-                                  'description': description,
-                                  'authenticationSettings': {
-                                      'networkProtocol': 'RADIUS',
-                                      'radiusSharedSecret': radius_key,
-                                      'enableKeyWrap': 'false',
-                                  },
-                                  'snmpsettings': {
-                                      'version': 'TWO_C',
-                                      'roCommunity': snmp_ro,
-                                      'pollingInterval': 3600,
-                                      'linkTrapQuery': 'true',
-                                      'macTrapQuery': 'true',
-                                      'originatingPolicyServicesNode': 'Auto'
-                                  },
-                                  'profileName': dev_profile,
-                                  'coaPort': 1700,
-                                  'NetworkDeviceIPList': [{
-                                      'ipaddress': ip_address,
-                                      'mask': 32
-                                  }],
-                                  'NetworkDeviceGroupList': [
-                                      dev_group, dev_type, dev_location,
-                                      'IPSEC#Is IPSEC Device#No'
-                                    ]
-                                  }
-                }
-
-        if tacacs_shared_secret is not None:
-            data['NetworkDevice']['tacacsSettings'] = {
-              'sharedSecret': tacacs_shared_secret,
-              'connectModeOptions': tacas_connect_mode_options
+        network_device_ip_list = [
+            {
+                'ipaddress': ip_address,
+                'mask': 32,
             }
+        ]
+
+        data = { 'NetworkDevice' : {
+            'name': name,
+            'description': description,
+            'NetworkDeviceIPList': network_device_ip_list,
+            'profileName': dev_profile,
+            }
+        }
+
+        if tacacs_shared_secret:
+            tacacs_settings = {
+                'sharedSecret': tacacs_shared_secret,
+                'connectModeOptions': tacacs_connect_mode_options,
+            }
+            data['NetworkDevice']['tacacsSettings'] = tacacs_settings
+
+        if radius_key:
+            authentication_settings = { 
+                'networkProtocol': 'RADIUS',
+                'radiusSharedSecret': radius_key,
+                'enableKeyWrap': 'false',
+            }
+            data['NetworkDevice']['authenticationSettings'] = authentication_settings
+
+        if snmp_ro:
+            snmp_settings = {
+                'version':  snmp_version,
+                'roCommunity': snmp_ro,
+                'pollingInterval': 3600,
+                'linkTrapQuery': 'true',
+                'macTrapQuery': 'true',
+                'originatingPolicyServicesNode': 'Auto',
+            }
+            data['NetworkDevice']['snmpsettings'] = snmp_settings
 
         resp = self._request('{0}/config/networkdevice'.format(self.url_base), method='post',
                              data=json.dumps(data))
